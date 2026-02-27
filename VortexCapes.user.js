@@ -14,7 +14,7 @@
     let targetUsernames = {};
     async function loadCapeAccess() {
         try {
-            const url = "https://raw.githubusercontent.com/GEORGECR0/VortexCapeAccess/refs/heads/main/CapeUsername.json";
+            const url = "https://raw.githubusercontent.com/GEORGECR0/ClientSideCapes/refs/heads/main/CapeAcces.json";
             const res = await fetch(url + "?t=" + Date.now());
             targetUsernames = await res.json();
         } catch (e) { console.error("Cape Load Error:", e); }

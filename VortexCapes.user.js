@@ -11,6 +11,7 @@
 
 (function() {
     'use strict';
+
     let targetUsernames = {};
     async function loadCapeAccess() {
         try {
@@ -21,62 +22,36 @@
     }
     loadCapeAccess();
 
-    const findAndLogNoa = () => {
-
-        const isNoa = o =>
-        o && typeof o === 'object' &&
-              o.entities && typeof o.entities.getState === 'function' &&
-              o.camera && typeof o.camera.getDirection === 'function' &&
-              o.world && typeof o.world.getBlock === 'function';
-
-        const isEntityMgr = o =>
-        o && typeof o === 'object' &&
-              o.entities && typeof o.entities.getState === 'function';
-
-        function deepScan(obj, check, visited = new Set()) {
-            if (!obj || typeof obj !== 'object' || visited.has(obj)) return null;
-            visited.add(obj);
-
+    function findNoa() {
+        const deepFindSafe = (obj, test, seen = new Set()) => {
+            if (!obj || typeof obj !== 'object' || seen.has(obj)) return null;
+            seen.add(obj);
             try {
-                if (check(obj)) return obj;
-                for (const v of Object.values(obj)) {
-                    const found = deepScan(v, check, visited);
-                    if (found) return found;
+                if (test(obj)) return obj;
+                for (const val of Object.values(obj)) {
+                    const res = deepFindSafe(val, test, seen);
+                    if (res) return res;
                 }
-            } catch {}
-            return null;
-        }
+            } catch (e) {}
+        };
 
-        function walkFibers(f) {
-            let node = f;
-            let steps = 0;
-            while (node && steps < 40) {
-                if (node.memoizedProps) {
-                    const match = deepScan(node.memoizedProps, isNoa) || deepScan(node.memoizedProps, isEntityMgr);
-                    if (match) return match;
-                }
-                if (node.memoizedState) {
-                    const match = deepScan(node.memoizedState, isNoa) || deepScan(node.memoizedState, isEntityMgr);
-                    if (match) return match;
-                }
-                node = node.return;
-                steps++;
-            }
-            return null;
-        }
+        let noa = null;
+        const getNoa = () => {
+            if (noa) return noa;
+            const element = document.querySelector('div.InventoryWrapper');
+            if (!element) return null;
+            const fiberKey = Object.keys(element).find(k => k.startsWith('__reactFiber$'));
+            if (!fiberKey) return null;
+            const fiber = element[fiberKey];
+            const test = (obj) => obj && obj.entities && typeof obj.entities.getState === 'function' && obj.camera;
+            noa = deepFindSafe(fiber.memoizedProps, test) || deepFindSafe(fiber.memoizedState, test);
+            window._noa = noa;
+            return noa; //
+        };
 
-        let result = null;
-        for (const el of document.querySelectorAll('*')) {
-            const fKey = Object.keys(el).find(k => k.startsWith('__reactFiber$'));
-            if (fKey) {
-                result = walkFibers(el[fKey]);
-                if (result) break;
-            }
-        }
+        const result = getNoa();
 
         if (result) {
-            window._noa = result;
-
             if (result.bloxd && typeof result.bloxd.entityNames === "object") {
 
                 for (const [id, data] of Object.entries(result.bloxd.entityNames)) {
@@ -106,14 +81,13 @@
                     }
                 }
             }
-
-            console.log("%c[Vortex Test Hook]", "color: #304870; font-weight: bold; font-size: 14px;", "Noa:");
             console.dir(result, { depth: 4 });
-
-        } else {
-            console.log("%c[Vortex Test Hook]", "color: #562121; font-weight: bold; font-size: 14px;", "Noa Failed To Run");
         }
-    };
-    document.addEventListener('keydown', e => e.key === 'j' && findAndLogNoa());
+
+
+        return result;
+
+    }
+    document.addEventListener('keydown', e => e.key === 'j' && findNoa());
 
 })();

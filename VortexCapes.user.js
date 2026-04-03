@@ -1,93 +1,94 @@
 // ==UserScript==
-// @name         Vortex Client Side Capes
+// @name         Thorium Renderer
 // @namespace    http://tampermonkey.net/
 // @version      1.0
-// @description  Fire
+// @description  This is Legit GAng
 // @author       GEORGECR
-// @icon         https://i.postimg.cc/fRpcmPqN/Vortex-Logo.png
 // @match        https://bloxd.io/*
-// @run-at       document-end
+// @icon         https://i.postimg.cc/NMG91FWH/space-BG-loco.jpg
+// @grant        none
+// @run-at       document-start
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
-    let targetUsernames = {};
-    async function loadCapeAccess() {
-        try {
-            const url = "https://raw.githubusercontent.com/GEORGECR0/ClientSideCapes/refs/heads/main/CapeAcces.json";
-            const res = await fetch(url + "?t=" + Date.now());
-            targetUsernames = await res.json();
-        } catch (e) { console.error("Cape Load Error:", e); }
-    }
-    loadCapeAccess();
+    const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
 
-    function findNoa() {
-        const deepFindSafe = (obj, test, seen = new Set()) => {
-            if (!obj || typeof obj !== 'object' || seen.has(obj)) return null;
-            seen.add(obj);
+    const offscreen = document.createElement('canvas');
+    offscreen.width = 4;
+    offscreen.height = 4;
+    const offCtx = offscreen.getContext('2d', { willReadFrequently: true });
+    CanvasRenderingContext2D.prototype.drawImage = function (...args) {
+        const src = args[0];
+
+        if (
+            src instanceof ImageBitmap &&
+            src.width === 8 &&
+            src.height === 8
+        ) {
+            let dx, dy, dw, dh;
+
+            if (args.length === 3) {
+                dx = args[1];
+                dy = args[2];
+                dw = src.width;
+                dh = src.height;
+            } else if (args.length === 5) {
+                dx = args[1];
+                dy = args[2];
+                dw = args[3];
+                dh = args[4];
+            } else if (args.length === 9) {
+                dx = args[5];
+                dy = args[6];
+                dw = args[7];
+                dh = args[8];
+            } else {
+                return originalDrawImage.apply(this, args);
+            }
+
             try {
-                if (test(obj)) return obj;
-                for (const val of Object.values(obj)) {
-                    const res = deepFindSafe(val, test, seen);
-                    if (res) return res;
-                }
-            } catch (e) {}
-        };
+                offCtx.clearRect(0, 0, 4, 4);
+                offCtx.drawImage(src, 0, 0, 4, 4);
 
-        let noa = null;
-        const getNoa = () => {
-            if (noa) return noa;
-            const element = document.querySelector('div.InventoryWrapper');
-            if (!element) return null;
-            const fiberKey = Object.keys(element).find(k => k.startsWith('__reactFiber$'));
-            if (!fiberKey) return null;
-            const fiber = element[fiberKey];
-            const test = (obj) => obj && obj.entities && typeof obj.entities.getState === 'function' && obj.camera;
-            noa = deepFindSafe(fiber.memoizedProps, test) || deepFindSafe(fiber.memoizedState, test);
-            window._noa = noa;
-            return noa; //
-        };
+                const data = offCtx.getImageData(0, 0, 4, 4).data;
 
-        const result = getNoa();
+                const blockW = dw / 4;
+                const blockH = dh / 4;
 
-        if (result) {
-            if (result.bloxd && typeof result.bloxd.entityNames === "object") {
+                this.save();
+                this.globalCompositeOperation = 'source-over';
 
-                for (const [id, data] of Object.entries(result.bloxd.entityNames)) {
+                for (let y = 0; y < 4; y++) {
+                    for (let x = 0; x < 4; x++) {
+                        const i = (y * 4 + x) * 4;
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        const a = data[i + 3] / 255;
 
-                    const username = data?.entityName;
-                    const textureURL = targetUsernames[username];
-                    if (!textureURL) continue;
+                        this.globalAlpha = a;
+                        this.fillStyle = `rgb(${r}, ${g}, ${b})`;
 
-                    if (textureURL) {
-                        const capeState = result.entities.getState(Number(id), "cape");
-
-                        if (capeState && typeof capeState.chooseCape === "function") {
-                            capeState.chooseCape("super");
-                            const capeMesh = capeState.mesh;
-                            if (!capeMesh) return;
-
-                            const CapeMaterial = capeMesh.material;
-                            if (!CapeMaterial || !CapeMaterial.diffuseTexture) return;
-
-                            CapeMaterial.diffuseTexture.updateURL(textureURL);
-                            CapeMaterial.diffuseTexture.hasAlpha = true;
-                            CapeMaterial.disableLighting = false;
-
-                            if (typeof CapeMaterial.markAsDirty === "function")
-                                CapeMaterial.markAsDirty();
-                        }
+                        this.fillRect(
+                            dx + x * blockW,
+                            dy + y * blockH,
+                            blockW,
+                            blockH
+                        );
                     }
                 }
+
+                this.restore();
+                return;
+
+            } catch (e) {
+                return originalDrawImage.apply(this, args);
             }
-            console.dir(result, { depth: 4 });
         }
 
-
-        return result;
-
-    }
-    document.addEventListener('keydown', e => e.key === 'j' && findNoa());
+        return originalDrawImage.apply(this, args);
+    };
 
 })();

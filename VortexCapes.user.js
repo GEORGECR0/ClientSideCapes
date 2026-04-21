@@ -1,94 +1,91 @@
 // ==UserScript==
-// @name         Thorium Renderer
+// @name         Vortex Client Side Capes
 // @namespace    http://tampermonkey.net/
 // @version      1.0
-// @description  This is Legit GAng
+// @description  Fire
 // @author       GEORGECR
+// @icon         https://i.postimg.cc/fRpcmPqN/Vortex-Logo.png
 // @match        https://bloxd.io/*
-// @icon         https://i.postimg.cc/NMG91FWH/space-BG-loco.jpg
-// @grant        none
-// @run-at       document-start
+// @run-at       document-end
 // ==/UserScript==
 
-(function () {
+(function() {
     'use strict';
 
-    const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
+        let targetUsernames = {};
+    async function loadCapeAccess() {
+        try {
+            const url = "https://raw.githubusercontent.com/GEORGECR0/ClientSideCapes/refs/heads/main/CapeAcces.json";
+            const res = await fetch(url + "?t=" + Date.now());
+            targetUsernames = await res.json();
+        } catch (e) { console.error("Cape Load Error:", e); }
+    }
+    loadCapeAccess();
 
-    const offscreen = document.createElement('canvas');
-    offscreen.width = 4;
-    offscreen.height = 4;
-    const offCtx = offscreen.getContext('2d', { willReadFrequently: true });
-    CanvasRenderingContext2D.prototype.drawImage = function (...args) {
-        const src = args[0];
-
-        if (
-            src instanceof ImageBitmap &&
-            src.width === 8 &&
-            src.height === 8
-        ) {
-            let dx, dy, dw, dh;
-
-            if (args.length === 3) {
-                dx = args[1];
-                dy = args[2];
-                dw = src.width;
-                dh = src.height;
-            } else if (args.length === 5) {
-                dx = args[1];
-                dy = args[2];
-                dw = args[3];
-                dh = args[4];
-            } else if (args.length === 9) {
-                dx = args[5];
-                dy = args[6];
-                dw = args[7];
-                dh = args[8];
-            } else {
-                return originalDrawImage.apply(this, args);
-            }
-
+    function findNoa() {
+        const deepFindSafe = (obj, test, seen = new Set()) => {
+            if (!obj || typeof obj !== 'object' || seen.has(obj)) return null;
+            seen.add(obj);
             try {
-                offCtx.clearRect(0, 0, 4, 4);
-                offCtx.drawImage(src, 0, 0, 4, 4);
+                if (test(obj)) return obj;
+                for (const val of Object.values(obj)) {
+                    const res = deepFindSafe(val, test, seen);
+                    if (res) return res;
+                }
+            } catch (e) {}
+        };
 
-                const data = offCtx.getImageData(0, 0, 4, 4).data;
+        let noa = null;
+        const getNoa = () => {
+            if (noa) return noa;
+            const element = document.querySelector('div.InventoryWrapper');
+            if (!element) return null;
+            const fiberKey = Object.keys(element).find(k => k.startsWith('__reactFiber$'));
+            if (!fiberKey) return null;
+            const fiber = element[fiberKey];
+            const test = (obj) => obj && obj.entities && typeof obj.entities.getState === 'function' && obj.camera;
+            noa = deepFindSafe(fiber.memoizedProps, test) || deepFindSafe(fiber.memoizedState, test);
+            window._noa = noa;
+            return noa; //
+        };
 
-                const blockW = dw / 4;
-                const blockH = dh / 4;
+        const result = getNoa();
 
-                this.save();
-                this.globalCompositeOperation = 'source-over';
+        if (result) {
+            if (result.bloxd && typeof result.bloxd.entityNames === "object") {
 
-                for (let y = 0; y < 4; y++) {
-                    for (let x = 0; x < 4; x++) {
-                        const i = (y * 4 + x) * 4;
-                        const r = data[i];
-                        const g = data[i + 1];
-                        const b = data[i + 2];
-                        const a = data[i + 3] / 255;
+                for (const [id, data] of Object.entries(result.bloxd.entityNames)) {
 
-                        this.globalAlpha = a;
-                        this.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                    const username = data?.entityName;
+                    const textureURL = targetUsernames[username];
+                    if (!textureURL) continue;
 
-                        this.fillRect(
-                            dx + x * blockW,
-                            dy + y * blockH,
-                            blockW,
-                            blockH
-                        );
+                    if (textureURL) {
+                        const capeState = result.entities.getState(Number(id), "cape");
+
+                        if (capeState && typeof capeState.chooseCape === "function") {
+                            capeState.chooseCape("super");
+                            const capeMesh = capeState.mesh;
+                            if (!capeMesh) return;
+
+                            const CapeMaterial = capeMesh.material;
+                            if (!CapeMaterial || !CapeMaterial.diffuseTexture) return;
+
+                            CapeMaterial.diffuseTexture.updateURL(textureURL);
+                            CapeMaterial.diffuseTexture.hasAlpha = true;
+                            CapeMaterial.disableLighting = false;
+
+                            if (typeof CapeMaterial.markAsDirty === "function")
+                                CapeMaterial.markAsDirty();
+                        }
                     }
                 }
-
-                this.restore();
-                return;
-
-            } catch (e) {
-                return originalDrawImage.apply(this, args);
             }
         }
 
-        return originalDrawImage.apply(this, args);
-    };
+        return result;
+
+    }
+    document.addEventListener('keydown', e => e.key === 'j' && findNoa());
 
 })();
